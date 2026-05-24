@@ -12,6 +12,8 @@ defmodule Mix.Tasks.Crap do
 
       --coverdata GLOB     Coverdata file(s) to import (repeatable).
       --no-coverage        Complexity-only: skip coverage, score all as 0% covered.
+      --beams GLOB         Analyze these compiled beams instead of the current
+                           project (e.g. the Elixir stdlib or a release). Repeatable.
       --complexity-source S  source (default) | debug_info. `source` measures CC on
                              source AST so macro DSLs (Ecto/HEEX) don't inflate it.
       --min-score N        Fail if any gated function CRAP > N. Default: 30.
@@ -54,6 +56,7 @@ defmodule Mix.Tasks.Crap do
     dispatch_max_clause_cc: :integer,
     no_coverage: :boolean,
     complexity_source: :string,
+    beams: :keep,
     paths: :keep
   ]
 
@@ -83,6 +86,7 @@ defmodule Mix.Tasks.Crap do
       include_macros: Keyword.get(opts, :include_macros, false),
       no_coverage: no_coverage,
       complexity_source: complexity_source(opts),
+      beams: Keyword.get_values(opts, :beams),
       # In complexity-only mode, score uncovered functions rather than skip them.
       on_no_coverage: if(no_coverage, do: :zero, else: on_no_coverage(opts)),
       sort: sort(opts),

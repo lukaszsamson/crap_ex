@@ -23,7 +23,8 @@ defmodule CrapEx.Config do
           dispatch_threshold: pos_integer(),
           dispatch_max_clause_cc: pos_integer(),
           no_coverage: boolean(),
-          complexity_source: :source | :debug_info
+          complexity_source: :source | :debug_info,
+          beams: [String.t()]
         }
 
   defstruct paths: ["lib"],
@@ -50,7 +51,11 @@ defmodule CrapEx.Config do
             # Where cyclomatic complexity is measured. `:source` (default) parses
             # source files so macro DSLs (Ecto/HEEX) stay opaque and don't inflate
             # CC; `:debug_info` counts the macro-expanded compiled AST (legacy).
-            complexity_source: :source
+            complexity_source: :source,
+            # Explicit beam globs to analyze instead of the current Mix project's
+            # compiled output (e.g. the Elixir stdlib or a release). When set, the
+            # project/`paths` discovery is bypassed.
+            beams: []
 
   @doc "Build a config from a keyword list, applying defaults."
   @spec new(keyword()) :: t()

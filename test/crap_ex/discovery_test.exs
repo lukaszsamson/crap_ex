@@ -55,6 +55,15 @@ defmodule CrapEx.DiscoveryTest do
     assert classify3.line_end > classify3.line_start
   end
 
+  test "explicit --beams globs bypass project discovery" do
+    # Build the path from the compile path (robust under `mix test --cover`, where
+    # :code.which/1 returns :cover_compiled rather than a beam path).
+    beam = Path.join(Mix.Project.compile_path(), "Elixir.CrapFixtures.Shapes.beam")
+    {:ok, entries} = Discovery.discover(CrapEx.Config.new(beams: [beam]))
+    names = entries |> Enum.map(fn {id, _} -> id.name end) |> Enum.uniq()
+    assert :classify in names
+  end
+
   test "non-Elixir modules are skipped, not fatal" do
     # Erlang modules carry the :erl_abstract_code backend; we only analyze Elixir.
     assert {:error, {:non_elixir_module, :erl_abstract_code}} =

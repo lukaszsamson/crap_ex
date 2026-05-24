@@ -63,6 +63,31 @@ mix crap --no-coverage --min-score 30
 Works in **umbrella** projects too — run it from the umbrella root (it analyzes
 every child app) or from inside a single app.
 
+### Running on itself, the Elixir stdlib, or any compiled beams
+
+`crap_ex` analyzes compiled BEAM files (via `debug_info`) plus the source on disk,
+so it can run on more than the current project:
+
+```sh
+# On crap_ex itself — it's a normal Mix project, so just run the task in its repo:
+mix crap --no-coverage
+
+# On any external set of compiled beams — point --beams at their ebin dir(s).
+# Coverage usually won't be available, so pair it with --no-coverage.
+# Example: the Elixir standard library (run from any project that has crap_ex):
+mix crap --no-coverage --beams "$(elixir -e 'IO.puts(Path.expand(:code.lib_dir(:elixir)))')/ebin/*.beam"
+
+# A release or any other ebin directory:
+mix crap --no-coverage --beams "_build/prod/rel/myapp/lib/*/ebin/*.beam"
+```
+
+`--beams` bypasses project discovery and analyzes exactly the matched modules
+(non-Elixir/`.erl` modules are skipped). Complexity is read from each module's
+source file when it can be located on disk; functions whose source can't be found
+(stripped sources, generated code) are reported but not gated. On the Elixir
+stdlib this matches ~93% of clauses and surfaces genuinely complex internals like
+`Kernel.Typespec.typespec/4` and `Code.Formatter.quoted_to_algebra/3`.
+
 Exit codes: `0` pass, `1` gate failure, `2` usage/internal error. Run
 `mix help crap` for the full option list.
 

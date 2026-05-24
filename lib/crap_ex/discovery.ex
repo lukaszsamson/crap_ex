@@ -26,6 +26,12 @@ defmodule CrapEx.Discovery do
   filter still matches.
   """
   @spec discover(Config.t()) :: {:ok, [entry()]} | {:error, term()}
+  def discover(%Config{beams: [_ | _] = globs}) do
+    # Explicit beam globs (e.g. the Elixir stdlib, a release, any ebin dir): analyze
+    # exactly those modules, with no project/path filtering.
+    globs |> Enum.flat_map(&Path.wildcard/1) |> Enum.uniq() |> discover_beams()
+  end
+
   def discover(%Config{paths: paths}) do
     with {:ok, entries} <- discover_beams(project_beams()) do
       {:ok, filter_paths(entries, paths)}
