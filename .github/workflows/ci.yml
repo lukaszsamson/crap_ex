@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  check:
+    name: check (Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # G8 version matrix. Starts narrow (the supported toolchain); the
+      # debug_info adapter fails loudly on unsupported versions, so widening
+      # this matrix is how new Elixir releases get vetted.
+      matrix:
+        include:
+          - elixir: "1.19"
+            otp: "28"
+    env:
+      MIX_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for --changed-only diffs
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
+
+      - name: Restore deps + build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+
+      - name: Restore Dialyzer PLT
+        uses: actions/cache@v4
+        with:
+          path: priv/plts
+          key: ${{ runner.os }}-plt-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+
+      - run: mix deps.get
+      - run: mix format --check-formatted
+      - run: mix deps.unlock --check-unused
+      - run: mix compile --warnings-as-errors
+      - run: mix credo --strict
+      - run: mix sobelow --exit --skip
+      - run: mix dialyzer
+
+      - name: Tests + coverage export
+        run: mix test --cover --export-coverage crap --exclude uses_cover
+
+      - name: Cover-driving tests (separately, not under --cover)
+        run: mix test --only uses_cover
+
+      - name: CRAP gate (changed-only on PRs)
+        if: github.event_name == 'pull_request'
+        run: >
+          mix crap --coverdata cover/crap.coverdata --min-score 30
+          --changed-only origin/${{ github.base_ref }}
+          --format sarif --output crap.sarif
+
+      - name: CRAP gate (full, on main)
+        if: github.event_name == 'push'
+        run: mix crap --coverdata cover/crap.coverdata --min-score 30
+
+      - name: Upload SARIF
+        if: github.event_name == 'pull_request' && always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: crap.sarif
+        continue-on-error: true
