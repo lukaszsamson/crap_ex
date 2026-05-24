@@ -30,12 +30,16 @@ defmodule CrapEx do
     with {:ok, entries} <- Discovery.discover(config),
          entries = filter_kinds(entries, config),
          {:ok, scope} <- Scope.resolve(entries, config),
-         {:ok, coverage} <- Coverage.load(config, entries) do
+         {:ok, coverage} <- load_coverage(config, entries) do
       config = %{config | scope: scope}
       metrics = build_metrics(entries, coverage, config)
       {:ok, Report.build(metrics, config, deviations(config))}
     end
   end
+
+  # Complexity-only mode: no coverage data, every function scored as uncovered.
+  defp load_coverage(%Config{no_coverage: true}, _entries), do: {:ok, %{}}
+  defp load_coverage(config, entries), do: Coverage.load(config, entries)
 
   defp filter_kinds(entries, %Config{include_macros: false}) do
     Enum.reject(entries, fn {id, _ast} -> CrapEx.ClauseId.macro?(id) end)
@@ -61,6 +65,11 @@ defmodule CrapEx do
       "Coverage is line-based (:cover clause analysis), not path/branch coverage; CRAP is a lower bound for branchy code.",
       "Cyclomatic complexity is derived from the source AST, not the BEAM control-flow graph."
     ]
+
+    base =
+      if config.no_coverage,
+        do: ["Complexity-only mode: coverage assumed 0% (worst-case CRAP)." | base],
+        else: base
 
     if config.include_macros do
       base ++

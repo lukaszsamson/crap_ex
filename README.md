@@ -55,7 +55,13 @@ mix crap --coverdata "cover/*.coverdata" --format sarif --output crap.sarif
 # Ratchet down legacy debt without blocking it:
 mix crap --coverdata "cover/*.coverdata" --write-baseline .crap_baseline.json
 mix crap --coverdata "cover/*.coverdata" --baseline .crap_baseline.json
+
+# Complexity-only (no test run): find hotspots, scoring everything as 0% covered:
+mix crap --no-coverage --min-score 30
 ```
+
+Works in **umbrella** projects too — run it from the umbrella root (it analyzes
+every child app) or from inside a single app.
 
 Exit codes: `0` pass, `1` gate failure, `2` usage/internal error. Run
 `mix help crap` for the full option list.
@@ -67,10 +73,14 @@ These approximations are deliberate and reported in `--explain`:
 - **Coverage is line-based, not path/branch coverage.** `:cover` counts
   executable-line hits per clause, not basis paths. The CRAP reported here is a
   *lower bound* on the true CRAP for branchy code.
-- **Complexity is source-AST-derived, not from the BEAM control-flow graph.**
-  Note that `debug_info` stores the *macro-expanded* AST, so `if`/`&&`/`with`
-  appear as `case`/`cond`; the visitor's branch counting still yields correct
-  classic CC.
+- **Complexity is read from the macro-*expanded* AST (`debug_info`).** For plain
+  code this is fine (`if`/`&&`/`with` become `case`/`cond`, and branch counting
+  still yields correct classic CC). But **heavy compile-time DSLs inflate CC**:
+  a Phoenix `~H` template or a large Ecto `from/where` query expands into hundreds
+  or thousands of generated `case` nodes, so a `render/1` or query builder can
+  report CC in the hundreds. Treat very-high-CC single-clause functions in
+  Phoenix/Ecto code as "generated", not hand-written, complexity. (Computing CC
+  from the *source* AST instead is the planned fix — see `PLAN.md`.)
 - **Macros are not gated by default.** Macro bodies often run at compile time and
   can read as uncovered; gate them only with `--include-macros`.
 - **Generated dispatch tables are dampened.** Macro-generated lookup tables (HTTP status

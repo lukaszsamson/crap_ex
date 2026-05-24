@@ -518,6 +518,31 @@ An external GPT review flagged correctness gaps; fixes landed with tests:
   tests total) with no further crashes. Ecto (1,336 functions) surfaced legitimate findings
   like `Ecto.Query.Builder.call_type/2` (CC 35, 31% → 430) and `Ecto.Repo.Assoc.merge/3`
   (CC 10, 0% → 110); gettext produced no false alarms (worst 20, under threshold).
+### 13.3 Umbrella validation (unilink, zorbito)
+
+Two real Phoenix/Ecto umbrellas (unilink: 5 apps, ~2,600 modules; zorbito: 14 apps,
+~3,600 modules), run via path dep at both the umbrella root and inside a child app.
+
+- **Bug found & fixed — umbrella root crashed.** `Mix.Project.compile_path/0` raises
+  "umbrellas have no app", so `mix crap` died at the root. `Discovery.discover/1` now
+  detects `Mix.Project.umbrella?/0` and gathers each child app's beams from
+  `build_path/lib/<app>/ebin` via `Mix.Project.apps_paths/0`. Child `debug_info`
+  reports source files relative to the child app (`lib/foo.ex`), so the default `lib`
+  path filter still matches. Verified: root now discovers across all apps (unilink
+  ~functions across 5 apps; zorbito 6,209 functions across 14 apps), and app-level runs
+  work like any single app.
+- **Added `--no-coverage` (complexity-only) mode** so the umbrellas could be exercised
+  without standing up their ExCoveralls + DB test infrastructure; also generally useful.
+- **Key finding — macro-DSL CC inflation.** App-level results were clean and accurate
+  (`Unilink.TaskManagement.decline_task/3`: CC 10 verified against 31 LOC / 11 source
+  branches). But web apps inflated badly: `base_grid_query/2` (26 LOC, ~3 source branches)
+  scored **CC 1023** because its Ecto `from/where` expands to **1,022 generated `case`
+  nodes** (one per field schema check), and Phoenix `~H` `render/1` functions hit CC 500+.
+  This is not a visitor bug — `debug_info` is post-expansion. It is the strongest argument
+  for computing complexity from the **source AST** rather than `debug_info` (the deferred
+  M2 fallback); doing so would also retire the macro-expansion deviation and the dispatch
+  dampening heuristic. Tracked as the top roadmap item.
+
 - **No runtime JSON dependency.** Output now uses Elixir's built-in `JSON` (1.18+) instead
   of Jason — removing the runtime dep and the project-name collision that previously blocked
   running on Jason itself. Trade-off: output is compact (the built-in `JSON` has no

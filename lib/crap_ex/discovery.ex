@@ -18,18 +18,31 @@ defmodule CrapEx.Discovery do
   @doc """
   Discover clauses for the modules of the current Mix project, restricted to
   source files living under `config.paths`.
+
+  Works from an umbrella root too: there `Mix.Project.compile_path/0` raises
+  ("umbrellas have no app"), so we gather the compiled beams of every child app
+  from the build path instead. Child-app `debug_info` reports source files
+  relative to the child app (e.g. `lib/foo.ex`), so the default `lib` path
+  filter still matches.
   """
   @spec discover(Config.t()) :: {:ok, [entry()]} | {:error, term()}
   def discover(%Config{paths: paths}) do
-    compile_path = Mix.Project.compile_path()
-
-    beams =
-      compile_path
-      |> Path.join("*.beam")
-      |> Path.wildcard()
-
-    with {:ok, entries} <- discover_beams(beams) do
+    with {:ok, entries} <- discover_beams(project_beams()) do
       {:ok, filter_paths(entries, paths)}
+    end
+  end
+
+  defp project_beams do
+    if Mix.Project.umbrella?() do
+      build = Mix.Project.build_path()
+
+      Mix.Project.apps_paths()
+      |> Map.keys()
+      |> Enum.flat_map(fn app ->
+        Path.wildcard(Path.join([build, "lib", to_string(app), "ebin", "*.beam"]))
+      end)
+    else
+      Path.wildcard(Path.join(Mix.Project.compile_path(), "*.beam"))
     end
   end
 

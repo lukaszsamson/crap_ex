@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Umbrella support: `mix crap` runs from an umbrella root (analyzing every child
+  app) — previously `Mix.Project.compile_path/0` raised "umbrellas have no app".
+- `--no-coverage` complexity-only mode: score every function as 0% covered
+  (worst-case CRAP) without running the test suite, for finding hotspots.
+
+### Known limitations
+
+- Complexity is read from the macro-expanded `debug_info` AST, so Phoenix `~H`
+  templates and large Ecto queries report inflated CC (hundreds–thousands).
+  Source-AST complexity is the planned fix.
+
 ## [0.1.0] - 2026-05-24
 
 Initial release.

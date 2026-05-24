@@ -10,7 +10,8 @@ defmodule Mix.Tasks.Crap do
 
   ## Options
 
-      --coverdata GLOB     Coverdata file(s) to import (required, repeatable).
+      --coverdata GLOB     Coverdata file(s) to import (repeatable).
+      --no-coverage        Complexity-only: skip coverage, score all as 0% covered.
       --min-score N        Fail if any gated function CRAP > N. Default: 30.
       --max-complexity N   Also fail if a gated function CC > N.
       --changed-only REF   Gate only functions whose lines changed vs git REF.
@@ -49,6 +50,7 @@ defmodule Mix.Tasks.Crap do
     dampen: :boolean,
     dispatch_threshold: :integer,
     dispatch_max_clause_cc: :integer,
+    no_coverage: :boolean,
     paths: :keep
   ]
 
@@ -66,6 +68,8 @@ defmodule Mix.Tasks.Crap do
   end
 
   defp build_config(opts) do
+    no_coverage = Keyword.get(opts, :no_coverage, false)
+
     Config.new(
       coverdata: Keyword.get_values(opts, :coverdata),
       paths: paths(opts),
@@ -74,7 +78,9 @@ defmodule Mix.Tasks.Crap do
       changed_only: opts[:changed_only],
       baseline: opts[:baseline],
       include_macros: Keyword.get(opts, :include_macros, false),
-      on_no_coverage: on_no_coverage(opts),
+      no_coverage: no_coverage,
+      # In complexity-only mode, score uncovered functions rather than skip them.
+      on_no_coverage: if(no_coverage, do: :zero, else: on_no_coverage(opts)),
       sort: sort(opts),
       explain: Keyword.get(opts, :explain, false),
       dampen: Keyword.get(opts, :dampen, true),

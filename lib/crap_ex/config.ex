@@ -21,7 +21,8 @@ defmodule CrapEx.Config do
           explain: boolean(),
           dampen: boolean(),
           dispatch_threshold: pos_integer(),
-          dispatch_max_clause_cc: pos_integer()
+          dispatch_max_clause_cc: pos_integer(),
+          no_coverage: boolean()
         }
 
   defstruct paths: ["lib"],
@@ -40,7 +41,11 @@ defmodule CrapEx.Config do
             # so their CRAP does not dominate; still reported separately.
             dampen: true,
             dispatch_threshold: 10,
-            dispatch_max_clause_cc: 2
+            dispatch_max_clause_cc: 2,
+            # Complexity-only mode: skip coverage entirely and score every
+            # function as 0% covered (worst-case CRAP). Useful for finding
+            # complexity hotspots without running the test suite.
+            no_coverage: false
 
   @doc "Build a config from a keyword list, applying defaults."
   @spec new(keyword()) :: t()

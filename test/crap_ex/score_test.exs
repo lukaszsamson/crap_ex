@@ -59,6 +59,16 @@ defmodule CrapEx.ScoreTest do
       assert m.crap == 20.0
     end
 
+    test "complexity-only mode (no coverage) scores worst-case CRAP" do
+      # No coverdata: analyze treats every function as uncovered via :zero policy.
+      config = CrapEx.Config.new(no_coverage: true, on_no_coverage: :zero)
+      {:ok, report} = CrapEx.analyze(config)
+      assert "Complexity-only mode: coverage assumed 0% (worst-case CRAP)." in report.deviations
+      # crap_ex's own modules are discovered; everything has a numeric CRAP.
+      assert Enum.all?(report.functions, &is_number(&1.crap))
+      assert report.functions != []
+    end
+
     test "computes coverage fraction and crap" do
       m = Score.metric({Foo, :bar, 1}, 5, {0, 3})
       assert m.coverage == 0.0
