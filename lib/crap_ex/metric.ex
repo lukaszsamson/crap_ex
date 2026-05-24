@@ -15,6 +15,7 @@ defmodule CrapEx.Metric do
           cc: pos_integer(),
           clauses: pos_integer(),
           dispatch: boolean(),
+          source_matched: boolean(),
           covered_lines: non_neg_integer(),
           relevant_lines: non_neg_integer(),
           coverage: float() | :not_applicable,
@@ -33,6 +34,11 @@ defmodule CrapEx.Metric do
     # `dispatch: true` marks a macro-generated dispatch table — many trivial
     # (CC 1) clauses, e.g. an HTTP-status or timezone lookup. Its CRAP is scored
     # with a dampened effective complexity so generated code does not dominate.
-    dispatch: false
+    dispatch: false,
+    # `source_matched: false` marks a unit whose complexity could NOT be measured
+    # from source (no matching `def` — templates, `defexception`, `use`-injected,
+    # other generated functions). Such units are never gated, since the only CC we
+    # have is the unreliable macro-expanded one.
+    source_matched: true
   ]
 end

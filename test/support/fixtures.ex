@@ -62,6 +62,16 @@ defmodule CrapFixtures.Shapes do
   # cc: 1 base + 1 (guard `or` -> :erlang.orelse) = 2
   def guarded(x) when is_integer(x) or is_binary(x), do: x
 
+  # cc: 1 — the `if` lives inside `quote` (code generation), so it must NOT count.
+  def builds_ast(x) do
+    quote do
+      if unquote(x), do: 1, else: 2
+    end
+  end
+
+  # default arg: compiles to defaulted/2 (body) + generated defaulted/1.
+  def defaulted(x, y \\ 5), do: x + y
+
   # cc: 1 (private, one executable body line)
   defp helper(x), do: x + 1
 

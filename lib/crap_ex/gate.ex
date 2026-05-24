@@ -42,8 +42,10 @@ defmodule CrapEx.Gate do
     applicable?(m) and in_scope?(m, config)
   end
 
-  # Generated dispatch tables are reported separately, never gated.
+  # Generated dispatch tables and units whose CC couldn't be measured from source
+  # (templates, generated functions) are reported separately, never gated.
   defp applicable?(%Metric{dispatch: true}), do: false
+  defp applicable?(%Metric{source_matched: false}), do: false
   defp applicable?(%Metric{crap: :not_applicable}), do: false
   defp applicable?(_), do: true
 

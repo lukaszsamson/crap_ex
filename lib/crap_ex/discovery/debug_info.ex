@@ -44,8 +44,9 @@ defmodule CrapEx.Discovery.DebugInfo do
   defp decode(module, {:debug_info_v1, :elixir_erl, {:elixir_v1, map, _specs}})
        when is_map(map) do
     file = Map.get(map, :relative_file) || Map.get(map, :file) || ""
+    abs_file = if abs = Map.get(map, :file), do: to_string(abs)
     definitions = Map.get(map, :definitions, [])
-    {:ok, decode_definitions(module, to_string(file), definitions)}
+    {:ok, decode_definitions(module, to_string(file), abs_file, definitions)}
   end
 
   defp decode(module, :none), do: {:error, {:no_debug_info, module}}
@@ -60,7 +61,7 @@ defmodule CrapEx.Discovery.DebugInfo do
   # is a real version mismatch and must fail loudly.
   defp decode(_module, other), do: {:error, {:unsupported_debug_info, summarize(other)}}
 
-  defp decode_definitions(module, file, definitions) do
+  defp decode_definitions(module, file, abs_file, definitions) do
     definitions
     |> Enum.flat_map(fn {{name, arity}, kind, _meta, clauses} ->
       clauses
@@ -79,6 +80,7 @@ defmodule CrapEx.Discovery.DebugInfo do
           kind: kind,
           clause_index: index,
           file: file,
+          abs_file: abs_file,
           line_start: line_start,
           line_end: line_end
         }

@@ -22,7 +22,8 @@ defmodule CrapEx.Config do
           dampen: boolean(),
           dispatch_threshold: pos_integer(),
           dispatch_max_clause_cc: pos_integer(),
-          no_coverage: boolean()
+          no_coverage: boolean(),
+          complexity_source: :source | :debug_info
         }
 
   defstruct paths: ["lib"],
@@ -45,7 +46,11 @@ defmodule CrapEx.Config do
             # Complexity-only mode: skip coverage entirely and score every
             # function as 0% covered (worst-case CRAP). Useful for finding
             # complexity hotspots without running the test suite.
-            no_coverage: false
+            no_coverage: false,
+            # Where cyclomatic complexity is measured. `:source` (default) parses
+            # source files so macro DSLs (Ecto/HEEX) stay opaque and don't inflate
+            # CC; `:debug_info` counts the macro-expanded compiled AST (legacy).
+            complexity_source: :source
 
   @doc "Build a config from a keyword list, applying defaults."
   @spec new(keyword()) :: t()

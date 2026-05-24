@@ -34,6 +34,7 @@ defmodule CrapEx.Format.Json do
       "cc" => metric.cc,
       "clauses" => metric.clauses,
       "dispatch" => metric.dispatch,
+      "source_matched" => metric.source_matched,
       "coverage" => nullable(metric.coverage),
       "covered_lines" => metric.covered_lines,
       "relevant_lines" => metric.relevant_lines,

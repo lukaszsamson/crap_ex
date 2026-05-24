@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Source-AST complexity (default).** Cyclomatic complexity is now measured from
+  the source AST, where macro DSLs stay opaque — eliminating the massive CC
+  inflation for Ecto queries / Phoenix `~H` templates (an Ecto `from/where` query
+  dropped from CC 1023 to 1). Functions with no matching source `def` (templates,
+  generated, `use`-injected) are excluded from gating and reported separately.
+  `--complexity-source debug_info` restores the legacy macro-expanded counting.
+- The visitor now also counts `receive`, `for` filters, and multi-clause `fn`,
+  prunes `quote` blocks, and counts source-form guard operators.
 - Umbrella support: `mix crap` runs from an umbrella root (analyzing every child
   app) — previously `Mix.Project.compile_path/0` raised "umbrellas have no app".
 - `--no-coverage` complexity-only mode: score every function as 0% covered
@@ -15,9 +23,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Known limitations
 
-- Complexity is read from the macro-expanded `debug_info` AST, so Phoenix `~H`
-  templates and large Ecto queries report inflated CC (hundreds–thousands).
-  Source-AST complexity is the planned fix.
+- Source CC ignores branching introduced *inside* a macro you call (a lower bound
+  for macro-heavy logic). `for`-comprehension-generated multi-clause functions with
+  mixed clause complexity may still read high unless dispatch-dampened.
 
 ## [0.1.0] - 2026-05-24
 

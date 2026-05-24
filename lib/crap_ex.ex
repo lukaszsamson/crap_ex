@@ -10,7 +10,7 @@ defmodule CrapEx do
   path-coverage, source-AST vs CFG complexity).
   """
 
-  alias CrapEx.{Config, Coverage, Discovery, Report, Scope, Score}
+  alias CrapEx.{Complexity.Source, Config, Coverage, Discovery, Report, Scope, Score}
 
   @doc """
   Analyze the compiled application against imported coverage data and produce a
@@ -32,8 +32,8 @@ defmodule CrapEx do
          {:ok, scope} <- Scope.resolve(entries, config),
          {:ok, coverage} <- load_coverage(config, entries) do
       config = %{config | scope: scope}
-      metrics = build_metrics(entries, coverage, config)
-      {:ok, Report.build(metrics, config, deviations(config))}
+      {metrics, join_stats} = build_metrics(entries, coverage, config)
+      {:ok, Report.build(metrics, config, deviations(config), join_stats)}
     end
   end
 
@@ -47,14 +47,64 @@ defmodule CrapEx do
 
   defp filter_kinds(entries, _config), do: entries
 
-  defp build_metrics(entries, coverage, config) do
+  defp build_metrics(entries, coverage, %Config{complexity_source: :source} = config) do
+    backend = config.complexity_backend
+    source_index = source_index(entries)
+
+    {metrics, stats} =
+      Enum.map_reduce(entries, %{}, fn {id, {dbg_body, dbg_guards}}, stats ->
+        {body, guards, status} =
+          case Source.lookup(source_index, id.abs_file, id.name, id.arity, id.line_start) do
+            {:ok, {sbody, sguards}} -> {sbody, sguards, :matched_source}
+            {:miss, reason} -> {dbg_body, dbg_guards, fallback_status(id, reason)}
+          end
+
+        cc = backend.complexity(body, guards)
+        obs = Map.get(coverage, coverage_key(id), {0, 0})
+
+        metric = %{
+          Score.metric(id, cc, obs, config.on_no_coverage)
+          | source_matched: status == :matched_source
+        }
+
+        {metric, Map.update(stats, status, 1, &(&1 + 1))}
+      end)
+
+    {metrics, stats}
+  end
+
+  defp build_metrics(entries, coverage, %Config{complexity_source: :debug_info} = config) do
     backend = config.complexity_backend
 
-    Enum.map(entries, fn {id, {body, guards}} ->
-      cc = backend.complexity(body, guards)
-      obs = Map.get(coverage, coverage_key(id), {0, 0})
-      Score.metric(id, cc, obs, config.on_no_coverage)
-    end)
+    metrics =
+      Enum.map(entries, fn {id, {body, guards}} ->
+        cc = backend.complexity(body, guards)
+        obs = Map.get(coverage, coverage_key(id), {0, 0})
+        Score.metric(id, cc, obs, config.on_no_coverage)
+      end)
+
+    {metrics, %{debug_info: length(metrics)}}
+  end
+
+  defp source_index(entries) do
+    entries
+    |> Enum.map(fn {id, _} -> id.abs_file end)
+    |> Enum.reject(&is_nil/1)
+    |> Source.index()
+  end
+
+  # A miss on a generated-looking name (defstruct/protocol/impl/overridable/etc.)
+  # is expected; everything else is an unexpected fallback worth reporting.
+  defp fallback_status(%CrapEx.ClauseId{name: name}, _reason) do
+    if generated_name?(name), do: :generated, else: :fallback_debug_info
+  end
+
+  defp generated_name?(name) do
+    s = Atom.to_string(name)
+
+    String.starts_with?(s, "__") or
+      String.contains?(s, " ") or
+      name in [:__struct__, :__impl__, :__protocol__, :impl_for, :impl_for!, :struct_impl_for]
   end
 
   defp coverage_key(%CrapEx.ClauseId{module: m, name: n, arity: a, clause_index: i}),

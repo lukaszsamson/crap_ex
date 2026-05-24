@@ -12,6 +12,8 @@ defmodule Mix.Tasks.Crap do
 
       --coverdata GLOB     Coverdata file(s) to import (repeatable).
       --no-coverage        Complexity-only: skip coverage, score all as 0% covered.
+      --complexity-source S  source (default) | debug_info. `source` measures CC on
+                             source AST so macro DSLs (Ecto/HEEX) don't inflate it.
       --min-score N        Fail if any gated function CRAP > N. Default: 30.
       --max-complexity N   Also fail if a gated function CC > N.
       --changed-only REF   Gate only functions whose lines changed vs git REF.
@@ -51,6 +53,7 @@ defmodule Mix.Tasks.Crap do
     dispatch_threshold: :integer,
     dispatch_max_clause_cc: :integer,
     no_coverage: :boolean,
+    complexity_source: :string,
     paths: :keep
   ]
 
@@ -79,6 +82,7 @@ defmodule Mix.Tasks.Crap do
       baseline: opts[:baseline],
       include_macros: Keyword.get(opts, :include_macros, false),
       no_coverage: no_coverage,
+      complexity_source: complexity_source(opts),
       # In complexity-only mode, score uncovered functions rather than skip them.
       on_no_coverage: if(no_coverage, do: :zero, else: on_no_coverage(opts)),
       sort: sort(opts),
@@ -111,7 +115,15 @@ defmodule Mix.Tasks.Crap do
     end
   end
 
+  defp complexity_source(opts) do
+    case opts[:complexity_source] do
+      "debug_info" -> :debug_info
+      _ -> :source
+    end
+  end
+
   defp handle_report(report, config, opts) do
+    warn_join_stats(report)
     warn_diagnostics(report)
 
     case opts[:write_baseline] do
@@ -141,6 +153,27 @@ defmodule Mix.Tasks.Crap do
   end
 
   defp warn_diagnostics(_report), do: :ok
+
+  # Source-AST complexity diagnostics. Unmatched clauses (no source `def` — usually
+  # templates/generated) are excluded from gating, not scored on inflated CC, so
+  # this is informational: it reports source-match coverage so a surprisingly low
+  # rate (e.g. a line-metadata regression) is visible.
+  defp warn_join_stats(%{join_stats: stats}) when map_size(stats) > 0 do
+    total = stats |> Map.values() |> Enum.sum()
+    matched = Map.get(stats, :matched_source, 0)
+
+    if total > 0 do
+      pct = Float.round(matched / total * 100, 1)
+      unmatched = total - matched
+
+      Mix.shell().info(
+        "crap: complexity measured from source for #{matched}/#{total} clauses (#{pct}%); " <>
+          "#{unmatched} not gated (templates / generated / macro-injected)."
+      )
+    end
+  end
+
+  defp warn_join_stats(_report), do: :ok
 
   defp write_baseline(report, file) do
     File.write!(file, CrapEx.Format.Json.render(report))

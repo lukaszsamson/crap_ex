@@ -13,18 +13,23 @@ defmodule CrapEx.Report do
           functions: [Metric.t()],
           modules: %{module() => module_summary()},
           deviations: [String.t()],
+          join_stats: %{atom() => non_neg_integer()},
           config: CrapEx.Config.t()
         }
 
   @enforce_keys [:clauses, :functions, :modules, :deviations, :config]
-  defstruct [:clauses, :functions, :modules, :deviations, :config]
+  defstruct [:clauses, :functions, :modules, :deviations, :config, join_stats: %{}]
 
   @doc """
   Build a report from clause-level metrics: aggregates to functions and computes
   per-module summaries (max / mean / p90 of applicable function CRAP scores).
+
+  `join_stats` records how clause CCs were sourced (`:matched_source`,
+  `:fallback_debug_info`, `:generated`, …) for source-AST complexity diagnostics.
   """
-  @spec build([Metric.t()], CrapEx.Config.t(), [String.t()]) :: t()
-  def build(clause_metrics, config, deviations) do
+  @spec build([Metric.t()], CrapEx.Config.t(), [String.t()], %{atom() => non_neg_integer()}) ::
+          t()
+  def build(clause_metrics, config, deviations, join_stats \\ %{}) do
     functions =
       Score.aggregate_all(clause_metrics,
         policy: config.on_no_coverage,
@@ -35,7 +40,7 @@ defmodule CrapEx.Report do
 
     modules =
       functions
-      |> Enum.reject(& &1.dispatch)
+      |> Enum.reject(&(&1.dispatch or not &1.source_matched))
       |> Enum.group_by(fn %Metric{id: {m, _, _}} -> m end)
       |> Map.new(fn {mod, metrics} -> {mod, summarize(metrics)} end)
 
@@ -44,6 +49,7 @@ defmodule CrapEx.Report do
       functions: functions,
       modules: modules,
       deviations: deviations,
+      join_stats: join_stats,
       config: config
     }
   end

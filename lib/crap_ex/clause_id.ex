@@ -18,12 +18,25 @@ defmodule CrapEx.ClauseId do
           kind: kind(),
           clause_index: pos_integer(),
           file: String.t(),
+          abs_file: String.t() | nil,
           line_start: pos_integer(),
           line_end: pos_integer()
         }
 
   @enforce_keys [:module, :name, :arity, :kind, :clause_index, :file, :line_start, :line_end]
-  defstruct [:module, :name, :arity, :kind, :clause_index, :file, :line_start, :line_end]
+  defstruct [
+    :module,
+    :name,
+    :arity,
+    :kind,
+    :clause_index,
+    :file,
+    # Absolute source path (from debug_info `:file`), used to read source for
+    # source-AST complexity; `file` stays relative for display/filtering.
+    :abs_file,
+    :line_start,
+    :line_end
+  ]
 
   @doc "The `{module, name, arity}` key this clause aggregates into."
   @spec mfa(t()) :: {module(), atom(), arity()}

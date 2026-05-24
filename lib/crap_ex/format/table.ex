@@ -9,7 +9,8 @@ defmodule CrapEx.Format.Table do
 
   @spec render(Report.t()) :: iodata()
   def render(%Report{functions: functions, config: config} = report) do
-    {dispatch, scored} = Enum.split_with(functions, & &1.dispatch)
+    {unmatched, matched} = Enum.split_with(functions, &(not &1.source_matched))
+    {dispatch, scored} = Enum.split_with(matched, & &1.dispatch)
     rows = scored |> sort(config.sort) |> Enum.map(&row/1)
     header = ["FUNCTION", "CC", "COV%", "CRAP"]
     widths = column_widths([header | rows])
@@ -21,8 +22,18 @@ defmodule CrapEx.Format.Table do
       "\n",
       summary(report, scored),
       dispatch_section(dispatch),
+      unmatched_section(unmatched),
       explain(report),
       deviations(report.deviations)
+    ]
+  end
+
+  defp unmatched_section([]), do: []
+
+  defp unmatched_section(unmatched) do
+    [
+      "\n#{length(unmatched)} function(s) not gated — no source `def` matched ",
+      "(templates / generated / macro-injected).\n"
     ]
   end
 

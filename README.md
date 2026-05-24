@@ -73,14 +73,15 @@ These approximations are deliberate and reported in `--explain`:
 - **Coverage is line-based, not path/branch coverage.** `:cover` counts
   executable-line hits per clause, not basis paths. The CRAP reported here is a
   *lower bound* on the true CRAP for branchy code.
-- **Complexity is read from the macro-*expanded* AST (`debug_info`).** For plain
-  code this is fine (`if`/`&&`/`with` become `case`/`cond`, and branch counting
-  still yields correct classic CC). But **heavy compile-time DSLs inflate CC**:
-  a Phoenix `~H` template or a large Ecto `from/where` query expands into hundreds
-  or thousands of generated `case` nodes, so a `render/1` or query builder can
-  report CC in the hundreds. Treat very-high-CC single-clause functions in
-  Phoenix/Ecto code as "generated", not hand-written, complexity. (Computing CC
-  from the *source* AST instead is the planned fix — see `PLAN.md`.)
+- **Complexity is measured from the *source* AST** (default), so compile-time
+  DSLs stay opaque and don't inflate CC: an Ecto `from/where` or a Phoenix `~H`
+  template counts as ~1, not the hundreds of `case` nodes its macro expansion
+  generates. Functions with no matching source `def` (templates, `defexception`,
+  `use`-injected, other generated code) can't be measured from source and are
+  **excluded from gating**, reported separately. `--complexity-source debug_info`
+  restores the legacy (macro-expanded) counting. Caveat: source CC intentionally
+  ignores branching introduced *inside* a macro you call, so it is a lower bound
+  for macro-heavy logic.
 - **Macros are not gated by default.** Macro bodies often run at compile time and
   can read as uncovered; gate them only with `--include-macros`.
 - **Generated dispatch tables are dampened.** Macro-generated lookup tables (HTTP status

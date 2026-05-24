@@ -130,9 +130,12 @@ defmodule CrapEx.Score do
       dampen and clauses > threshold and Enum.all?(clause_metrics, &(&1.cc <= max_clause_cc))
 
     effective_cc = if dispatch?, do: 1, else: cc
+    # A function is source-trusted if at least one clause's CC came from source;
+    # fully-unmatched functions (templates, generated) are not gated.
+    source_matched? = Enum.any?(clause_metrics, & &1.source_matched)
 
     base = metric(mfa, effective_cc, {covered, relevant - covered}, policy)
-    %{base | cc: cc, clauses: clauses, dispatch: dispatch?}
+    %{base | cc: cc, clauses: clauses, dispatch: dispatch?, source_matched: source_matched?}
   end
 
   @doc """
