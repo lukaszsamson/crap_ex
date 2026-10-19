@@ -71,6 +71,7 @@ defmodule CrapEx.MixProject do
 
   defp deps do
     [
+      {:spec_lint, "~> 0.1", only: [:dev, :test], runtime: false},
       # Optional: ergonomic AST zipper traversal for the complexity visitor.
       {:sourceror, "~> 1.7", optional: true},
       # Optional: Credo-backed cyclomatic complexity backend.
